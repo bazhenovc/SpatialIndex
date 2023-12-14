@@ -1,10 +1,18 @@
 #pragma once
+#pragma once
 
 #include "ofVec2f.h"
 #include "ofColor.h"
 
 #include <vector>
 #include <functional>
+
+#pragma warning(push)
+#pragma warning(disable:4267)
+#include "flat_hash_map/bytell_hash_map.hpp"
+#pragma warning(pop)
+
+typedef ska::bytell_hash_map<int64_t, uint32_t> SpatialHashTable;
 
 const int TILE_SIZE = 16;
 
@@ -26,6 +34,8 @@ struct Particle2D
 };
 
 void spatial_index_sort(std::vector<Particle2D>& particles);
+
+void compute_spatial_hash_table(const std::vector<Particle2D>& particles, SpatialHashTable& hash_table);
 
 inline int64_t compute_spatial_index(int tile_x, int tile_y)
 {
@@ -71,3 +81,58 @@ inline size_t radius_query(std::vector<Particle2D>& particles, ofVec2f position,
 
 	return checked_particles;
 }
+
+template <typename Fn>
+inline size_t radius_query(std::vector<Particle2D>& particles, const SpatialHashTable* table, ofVec2f position, float radius, Fn fn)
+{
+	const int query_tile_x = int(std::floorf(position.x / float(TILE_SIZE)));
+	const int query_tile_y = int(std::floorf(position.y / float(TILE_SIZE)));
+
+	const int radius_in_tiles = int(std::ceilf(radius / float(TILE_SIZE)));
+
+	size_t checked_particles = 0;
+
+	for (int tile_y = (query_tile_y - radius_in_tiles); tile_y <= (query_tile_y + radius_in_tiles); ++tile_y)
+	{
+		const int64_t spatial_index_start = compute_spatial_index(query_tile_x - radius_in_tiles, tile_y);
+		const int64_t spatial_index_end = compute_spatial_index(query_tile_x + radius_in_tiles, tile_y);
+
+		auto found_particle = particles.end();
+		if (table)
+		{
+			for (int tile_x = (query_tile_x - radius_in_tiles); tile_x <= (query_tile_x + radius_in_tiles); ++tile_x)
+			{
+				auto found_tile = table->find(compute_spatial_index(tile_x, tile_y));
+				if (found_tile != table->end())
+				{
+					found_particle = particles.begin() + found_tile->second;
+					break;
+				}
+			}
+		}
+		else
+		{
+			found_particle = std::lower_bound(particles.begin(), particles.end(), spatial_index_start,
+				[](const Particle2D& particle, int64_t spatial_index)
+				{
+					return particle.spatial_index() < spatial_index;
+				});
+		}
+
+		for (; found_particle != particles.end(); ++found_particle)
+		{
+			if (found_particle->spatial_index() > spatial_index_end) { break; }
+
+			checked_particles++;
+
+			float radius_sum = radius + found_particle->radius;
+			if ((position - found_particle->position).lengthSquared() <= radius_sum * radius_sum)
+			{
+				fn(*found_particle);
+			}
+		}
+	}
+
+	return checked_particles;
+}
+

@@ -109,6 +109,9 @@
     <ClCompile Include="src\ofApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\flat_hash_map\bytell_hash_map.hpp" />
+    <ClInclude Include="src\flat_hash_map\flat_hash_map.hpp" />
+    <ClInclude Include="src\flat_hash_map\unordered_map.hpp" />
     <ClInclude Include="src\SpatialIndex.h" />
     <ClInclude Include="src\ofApp.h" />
   </ItemGroup>

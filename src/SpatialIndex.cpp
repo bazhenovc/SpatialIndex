@@ -61,3 +61,59 @@ void spatial_index_sort(std::vector<Particle2D>& particles)
 			return p0.spatial_index() < p1.spatial_index();
 		});
 }
+
+inline uint64_t ror64(uint64_t v, int r)
+{
+	return (v >> r) | (v << (64 - r));
+}
+
+inline uint64_t rrxmrrxmsx_0(uint64_t v)
+{
+	v ^= ror64(v, 25) ^ ror64(v, 50);
+	v *= 0xA24BAED4963EE407UL;
+	v ^= ror64(v, 24) ^ ror64(v, 49);
+	v *= 0x9FB21C651E98DF25UL;
+	return v ^ v >> 28;
+}
+
+inline uint64_t spatial_index_hash(int64_t value)
+{
+	uint64_t rr = 0;
+	std::memcpy(&rr, &value, sizeof(rr));
+	return rrxmrrxmsx_0(rr);
+}
+
+uint64_t upper_power_of_two(uint64_t v)
+{
+	v--;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v++;
+	return v;
+}
+
+void compute_spatial_hash_table(const std::vector<Particle2D>& particles, SpatialHashTable& hash_table)
+{
+	hash_table.clear();
+
+	for (const Particle2D& particle : particles)
+	{
+		int64_t spatial_index = particle.spatial_index();
+		size_t particle_index = &particle - &(*particles.begin());
+
+		auto table_value = hash_table.find(spatial_index);
+		if (table_value == hash_table.end())
+		{
+			hash_table.insert({ spatial_index, uint32_t(particle_index) });
+		}
+		else
+		{
+			table_value->second = std::min(table_value->second, uint32_t(particle_index));
+		}
+	}
+
+	return;
+}

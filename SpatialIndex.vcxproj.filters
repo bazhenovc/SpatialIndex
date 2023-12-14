@@ -15,6 +15,9 @@
     <Filter Include="src">
       <UniqueIdentifier>{d8376475-7454-4a24-b08a-aac121d3ad6f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\flat_hash_map">
+      <UniqueIdentifier>{9027dfb9-6529-421c-ad07-f49d66b2000d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ofApp.h">
@@ -22,6 +25,15 @@
     </ClInclude>
     <ClInclude Include="src\SpatialIndex.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\flat_hash_map\bytell_hash_map.hpp">
+      <Filter>src\flat_hash_map</Filter>
+    </ClInclude>
+    <ClInclude Include="src\flat_hash_map\flat_hash_map.hpp">
+      <Filter>src\flat_hash_map</Filter>
+    </ClInclude>
+    <ClInclude Include="src\flat_hash_map\unordered_map.hpp">
+      <Filter>src\flat_hash_map</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

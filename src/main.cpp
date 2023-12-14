@@ -33,12 +33,14 @@ private:
 	void reset_simulation();
 
 	std::vector<Particle2D> m_particles;
+	SpatialHashTable m_spatial_hash_table;
 	std::vector<std::pair<Particle2D*, Particle2D*>> m_contact_pairs;
 
 	uint64_t m_update_time = 0;
 	uint64_t m_query_time = 0;
 
 	bool m_use_spatial_query = true;
+	bool m_use_spatial_hashing = false;
 
 	bool m_paused = false;
 	bool m_run_step = false;
@@ -56,6 +58,11 @@ void SpatialIndexApp::keyReleased(int key)
 	if (key == ofKey::OF_KEY_TAB)
 	{
 		m_use_spatial_query = !m_use_spatial_query;
+	}
+
+	if (key == 't')
+	{
+		m_use_spatial_hashing = !m_use_spatial_hashing;
 	}
 
 	if (key == 'g')
@@ -107,6 +114,8 @@ void SpatialIndexApp::update()
 	uint64_t update_start_time = ofGetElapsedTimeMicros();
 	Particle2D* particle_data = m_particles.data(); // Don't want bounds checking in the inner loop
 
+	const SpatialHashTable* table = m_use_spatial_hashing ? &m_spatial_hash_table : nullptr;
+
 	m_solved_contacts = 0;
 	for (size_t iteration = 0; iteration < SOLVER_ITERATIONS; ++iteration)
 	{
@@ -117,7 +126,7 @@ void SpatialIndexApp::update()
 			{
 				Particle2D& particle0 = particle_data[particle_index0];
 
-				radius_query(m_particles, particle0.position, particle0.radius, [this, &particle0](Particle2D& particle1)
+				radius_query(m_particles, table, particle0.position, particle0.radius, [this, &particle0](Particle2D& particle1)
 					{
 						Particle2D* ptr0 = &particle0;
 						Particle2D* ptr1 = &particle1;
@@ -176,7 +185,9 @@ void SpatialIndexApp::update()
 			particle.color = ofColor::lightCyan;
 			particle.update(dt);
 		}
+
 		spatial_index_sort(m_particles);
+		compute_spatial_hash_table(m_particles, m_spatial_hash_table);
 	}
 
 	m_update_time = ofGetElapsedTimeMicros() - update_start_time;
@@ -189,7 +200,7 @@ void SpatialIndexApp::update()
 	uint64_t query_start_time = ofGetElapsedTimeMicros();
 	if (m_use_spatial_query)
 	{
-		m_checked_particles = radius_query(m_particles, mouse_position, m_search_radius,
+		m_checked_particles = radius_query(m_particles, table, mouse_position, m_search_radius,
 			[this](Particle2D& particle)
 			{
 				particle.color = ofColor::orangeRed;
@@ -238,6 +249,7 @@ void SpatialIndexApp::draw()
 	std::ostringstream oss;
 	oss << "FPS: " << ofGetFrameRate()
 		<< "\nUsing spatial indexing (TAB to toggle): " << m_use_spatial_query
+		<< "\nUsing spatial hashing (T to toggle): " << m_use_spatial_hashing
 		<< "\nPhysics update time: " << double(m_update_time) / 1000.0 << "ms"
 		<< "\nParticles: " << PARTICLE_COUNT << " Solved contacts: " << m_solved_contacts
 		<< "\nHighlight spatial query time: " << double(m_query_time) / 1000.0 << "ms"
@@ -269,6 +281,9 @@ void SpatialIndexApp::reset_simulation()
 
 		m_particles[particle_index] = particle;
 	}
+
+	spatial_index_sort(m_particles);
+	compute_spatial_hash_table(m_particles, m_spatial_hash_table);
 }
 
 int main()
