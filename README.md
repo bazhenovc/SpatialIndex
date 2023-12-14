@@ -1,9 +1,9 @@
 # SpatialIndex
 Implicit unbounded spatial acceleration structure based on spatial indexing.
 
-![image](https://github.com/bazhenovc/SpatialIndex/assets/986127/18575683-ef4d-4c16-84c5-a16998e78a83)
+![image](https://github.com/bazhenovc/SpatialIndex/assets/986127/17450101-b322-4502-bf65-dad546d95c33)
 
-5000 colliding particles with different sizes, ~14ms when spatial indexing is used, ~150ms when brute-force "each-to-each" approach is used.
+5000 colliding particles with different sizes, ~6ms when spatial hashing is used, ~14ms when spatial indexing is used, ~150ms when brute-force "each-to-each" approach is used.
 
 ## How it works
 
@@ -36,12 +36,39 @@ Now in order to find one specific particle at a given position, we compute the s
 Searching for all particles within a specific radius works in a similar fashion, but we need to check all tiles within the radius. To achieve that, we first compute the range of tiles within our radius, then we iterate that range row-by-row.
 For each tile row we need to perform one binary search to find the first particle in a row, but then we can simply increment the spatial index to get to adjacent columns. Look at `radius_query` function for reference.
 
-The demo uses spatial indexing to both find and resolve collision contact pairs and to find and highlight particles near the mouse cursor.
+Now the next obvious improvement is to get rid of the binary searching. We still want to keep the main data densely packed, so what I suggest is to compute a hash table that maps spatial index to particle index in the array. This is trivial to implement, note that particles array has to be sorted:
+
+```cpp
+void compute_spatial_hash_table(const std::vector<Particle2D>& particles, SpatialHashTable& hash_table)
+{
+	hash_table.clear();
+	for (const Particle2D& particle : particles)
+	{
+		int64_t spatial_index = particle.spatial_index();
+		size_t particle_index = &particle - &(*particles.begin());
+
+		auto table_value = hash_table.find(spatial_index);
+		if (table_value == hash_table.end())
+		{
+			hash_table.insert({ spatial_index, uint32_t(particle_index) });
+		}
+		else
+		{
+			table_value->second = std::min(table_value->second, uint32_t(particle_index));
+		}
+	}
+}
+```
+
+This allows us to replace the binary search by spatial index with hash table lookup by spatial index, rest of the code stays the same. Since we're now looking for an exact value instead of searching for a lesser value, we can't do the row trick anymore, so we need to do one individual lookup per adjacent tile. In practice this is still faster than binary search.
+
+The demo uses spatial hashing (with bytell_hash_table by Malte Skarupke) or spatial indexing to both find and resolve collision contact pairs and to find and highlight particles near the mouse cursor. Brute-force reference implementation is also provided, but it is extremely slow.
 
 ## Pros and cons
 
 Pros:
-* Zero memory overhead - tiles and spatial indices are implicit and not stored in memory.
+* Zero memory overhead when spatial hashing is not used - tiles and spatial indices are implicit and not stored in memory.
+* When spatial hashing is used, memory overhead is low - just an exra hash_table<int64_t, uint32_t>, this is entirely optional but provides big performance improvement.
 * Particle data is densely packed with no gaps or wasted space.
 * Easy to paralellize and can be trivially implemented on the GPU.
 
@@ -49,3 +76,4 @@ Cons:
 * Data structure needs to be always in sync. Every time particle positions are updated you need to sort them, or spatial queries will not work properly.
 * Binary searches are expensive, so you need a sufficiently large amount of particles and high particle density to outperform brute-force and other approaches.
 * In some cases it might be impractical to sort the entire particle array after every update step, this demo deals with it by accumulating the collision response force and only applying this force after all collisions are resolved (particles are sorted again after applying forces).
+* Spatial hashing mode will be hard to port to the GPU and run poorly there.
