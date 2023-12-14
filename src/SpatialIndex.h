@@ -13,8 +13,6 @@
 
 typedef ska::bytell_hash_map<int64_t, uint32_t> SpatialHashTable;
 
-const int TILE_SIZE = 16;
-
 struct Particle2D
 {
 	ofVec2f position = ofVec2f::zero();
@@ -24,17 +22,18 @@ struct Particle2D
 
 	ofColor color = ofColor::lightCyan;
 
-	int64_t spatial_index() const;
+	int64_t spatial_index(size_t tile_size) const;
 
 	void update(float dt);
 	void push(ofVec2f direction);
+	void teleport(ofVec2f new_position);
 
 	static void resolve_collision(Particle2D& particle0, Particle2D& particle1, float bounce);
 };
 
-void spatial_index_sort(std::vector<Particle2D>& particles);
+void spatial_index_sort(std::vector<Particle2D>& particles, size_t tile_size);
 
-void compute_spatial_hash_table(const std::vector<Particle2D>& particles, SpatialHashTable& hash_table);
+void compute_spatial_hash_table(const std::vector<Particle2D>& particles, size_t tile_size, SpatialHashTable& hash_table);
 
 inline int64_t compute_spatial_index(int tile_x, int tile_y)
 {
@@ -44,12 +43,12 @@ inline int64_t compute_spatial_index(int tile_x, int tile_y)
 
 // Invoke function for all particles inside the circle
 template <typename Fn>
-inline size_t radius_query(std::vector<Particle2D>& particles, const SpatialHashTable* table, ofVec2f position, float radius, Fn fn)
+inline size_t radius_query(std::vector<Particle2D>& particles, size_t tile_size, const SpatialHashTable* table, ofVec2f position, float radius, Fn fn)
 {
-	const int query_tile_x = int(std::floorf(position.x / float(TILE_SIZE)));
-	const int query_tile_y = int(std::floorf(position.y / float(TILE_SIZE)));
+	const int query_tile_x = int(std::floorf(position.x / float(tile_size)));
+	const int query_tile_y = int(std::floorf(position.y / float(tile_size)));
 
-	const int radius_in_tiles = int(std::ceilf(radius / float(TILE_SIZE)));
+	const int radius_in_tiles = int(std::ceilf(radius / float(tile_size)));
 
 	size_t checked_particles = 0;
 
@@ -74,15 +73,15 @@ inline size_t radius_query(std::vector<Particle2D>& particles, const SpatialHash
 		else
 		{
 			found_particle = std::lower_bound(particles.begin(), particles.end(), spatial_index_start,
-				[](const Particle2D& particle, int64_t spatial_index)
+				[tile_size](const Particle2D& particle, int64_t spatial_index)
 				{
-					return particle.spatial_index() < spatial_index;
+					return particle.spatial_index(tile_size) < spatial_index;
 				});
 		}
 
 		for (; found_particle != particles.end(); ++found_particle)
 		{
-			if (found_particle->spatial_index() > spatial_index_end) { break; }
+			if (found_particle->spatial_index(tile_size) > spatial_index_end) { break; }
 
 			checked_particles++;
 

@@ -9,9 +9,6 @@
 
 #include <sstream>
 
-static const int WINDOW_WIDTH = 1920;
-static const int WINDOW_HEIGHT = 1080;
-
 static const int PARTICLE_COUNT = 5000;
 static const int SOLVER_ITERATIONS = 3;
 
@@ -33,6 +30,8 @@ private:
 	void reset_simulation();
 
 	std::vector<Particle2D> m_particles;
+	size_t m_particle_tile_size = 0;
+
 	SpatialHashTable m_spatial_hash_table;
 	std::vector<std::pair<Particle2D*, Particle2D*>> m_contact_pairs;
 
@@ -40,7 +39,7 @@ private:
 	uint64_t m_query_time = 0;
 
 	bool m_use_spatial_query = true;
-	bool m_use_spatial_hashing = false;
+	bool m_use_spatial_hashing = true;
 
 	bool m_paused = false;
 	bool m_run_step = false;
@@ -93,7 +92,7 @@ void SpatialIndexApp::mouseScrolled(int x, int y, float scrollX, float scrollY)
 void SpatialIndexApp::setup()
 {
 	m_particles.resize(PARTICLE_COUNT);
-	
+
 	// Conservatively estimate contact pairs count, this will grow if needed
 	m_contact_pairs.reserve(m_particles.size() / 4);
 
@@ -126,7 +125,7 @@ void SpatialIndexApp::update()
 			{
 				Particle2D& particle0 = particle_data[particle_index0];
 
-				radius_query(m_particles, table, particle0.position, particle0.radius, [this, &particle0](Particle2D& particle1)
+				radius_query(m_particles, m_particle_tile_size, table, particle0.position, particle0.radius, [this, &particle0](Particle2D& particle1)
 					{
 						Particle2D* ptr0 = &particle0;
 						Particle2D* ptr1 = &particle1;
@@ -167,14 +166,14 @@ void SpatialIndexApp::update()
 		// Bounce off window bounds
 		for (Particle2D& particle : m_particles)
 		{
-			if (particle.position.x <= particle.radius || particle.position.x >= (float(WINDOW_WIDTH) - particle.radius) ||
-				particle.position.y <= particle.radius || particle.position.y >= (float(WINDOW_HEIGHT) - particle.radius))
+			if (particle.position.x <= particle.radius || particle.position.x >= (float(ofGetViewportWidth()) - particle.radius) ||
+				particle.position.y <= particle.radius || particle.position.y >= (float(ofGetViewportHeight()) - particle.radius))
 			{
 				ofVec2f border_point = ofVec2f(
-					ofClamp(particle.position.x, particle.radius, float(WINDOW_WIDTH) - particle.radius),
-					ofClamp(particle.position.y, particle.radius, float(WINDOW_HEIGHT) - particle.radius));
+					ofClamp(particle.position.x, particle.radius, float(ofGetViewportWidth()) - particle.radius),
+					ofClamp(particle.position.y, particle.radius, float(ofGetViewportHeight()) - particle.radius));
 
-				particle.push(border_point - particle.position);
+				particle.teleport(border_point);
 			}
 		}
 
@@ -186,8 +185,8 @@ void SpatialIndexApp::update()
 			particle.update(dt);
 		}
 
-		spatial_index_sort(m_particles);
-		compute_spatial_hash_table(m_particles, m_spatial_hash_table);
+		spatial_index_sort(m_particles, m_particle_tile_size);
+		compute_spatial_hash_table(m_particles, m_particle_tile_size, m_spatial_hash_table);
 	}
 
 	m_update_time = ofGetElapsedTimeMicros() - update_start_time;
@@ -200,7 +199,7 @@ void SpatialIndexApp::update()
 	uint64_t query_start_time = ofGetElapsedTimeMicros();
 	if (m_use_spatial_query)
 	{
-		m_checked_particles = radius_query(m_particles, table, mouse_position, m_search_radius,
+		m_checked_particles = radius_query(m_particles, m_particle_tile_size, table, mouse_position, m_search_radius,
 			[this](Particle2D& particle)
 			{
 				particle.color = ofColor::orangeRed;
@@ -243,7 +242,7 @@ void SpatialIndexApp::draw()
 
 	if (m_draw_grid)
 	{
-		ofDrawGrid(float(TILE_SIZE), WINDOW_WIDTH / TILE_SIZE, false, false, false, true);
+		ofDrawGrid(float(m_particle_tile_size), ofGetViewportWidth() / m_particle_tile_size, false, false, false, true);
 	}
 
 	size_t spatial_hash_table_size = 0;
@@ -257,7 +256,7 @@ void SpatialIndexApp::draw()
 		<< "\nUsing spatial indexing (TAB to toggle): " << m_use_spatial_query
 		<< "\nUsing spatial hashing (T to toggle): " << m_use_spatial_hashing
 		<< "\nPhysics update time: " << double(m_update_time) / 1000.0 << "ms"
-		<< "\nParticles: " << PARTICLE_COUNT
+		<< "\nParticles: " << PARTICLE_COUNT << " tile size: " << m_particle_tile_size
 		<< "\nSolved contacts: " << m_solved_contacts
 		<< "\nSpatial hash table size: " << float(spatial_hash_table_size) / 1024.0F << "Kb"
 		<< "\nHighlight spatial query time: " << double(m_query_time) / 1000.0 << "ms"
@@ -273,31 +272,36 @@ void SpatialIndexApp::draw()
 
 void SpatialIndexApp::reset_simulation()
 {
+	float max_radius = 0.0F;
 	for (int particle_index = 0; particle_index < PARTICLE_COUNT; ++particle_index)
 	{
 		Particle2D particle = {};
 
-		particle.radius = ofRandom(4.0F, 8.0F);
+		particle.radius = ofRandom(4.0F, 10.0F);
 		particle.position = {
-			ofRandom(particle.radius, float(WINDOW_WIDTH) - particle.radius),
-			ofRandom(particle.radius, float(WINDOW_HEIGHT) - particle.radius),
+			ofRandom(particle.radius, float(ofGetViewportWidth()) - particle.radius),
+			ofRandom(particle.radius, float(ofGetViewportHeight()) - particle.radius),
 		};
 
 		// particle.radius = float(TILE_SIZE / 2);
 		// particle.position.x = 500.0F;
 		// particle.position.y = 500.0F + float(particle_index * 10);
 
+		max_radius = std::max(max_radius, particle.radius);
+
 		m_particles[particle_index] = particle;
 	}
 
-	spatial_index_sort(m_particles);
-	compute_spatial_hash_table(m_particles, m_spatial_hash_table);
+	m_particle_tile_size = size_t(std::ceilf(max_radius * 2.0F));
+
+	spatial_index_sort(m_particles, m_particle_tile_size);
+	compute_spatial_hash_table(m_particles, m_particle_tile_size, m_spatial_hash_table);
 }
 
 int main()
 {
 	ofGLWindowSettings settings;
-	settings.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+	settings.setSize(1280, 1024);
 	settings.windowMode = OF_WINDOW;
 
 	auto window = ofCreateWindow(settings);

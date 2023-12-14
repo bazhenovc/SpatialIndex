@@ -3,10 +3,10 @@
 
 #include <algorithm>
 
-int64_t Particle2D::spatial_index() const
+int64_t Particle2D::spatial_index(size_t tile_size) const
 {
-	int tile_x = int(std::floorf(position.x / float(TILE_SIZE)));
-	int tile_y = int(std::floorf(position.y / float(TILE_SIZE)));
+	int tile_x = int(std::floorf(position.x / float(tile_size)));
+	int tile_y = int(std::floorf(position.y / float(tile_size)));
 
 	return compute_spatial_index(tile_x, tile_y);
 }
@@ -23,6 +23,12 @@ void Particle2D::push(ofVec2f direction)
 {
 	delta_position += direction;
 	//position += direction;
+}
+
+void Particle2D::teleport(ofVec2f new_position)
+{
+	delta_position += new_position - position;
+	position = new_position;
 }
 
 void Particle2D::resolve_collision(Particle2D& particle0, Particle2D& particle1, float bounce)
@@ -54,21 +60,21 @@ void Particle2D::resolve_collision(Particle2D& particle0, Particle2D& particle1,
 	}
 }
 
-void spatial_index_sort(std::vector<Particle2D>& particles)
+void spatial_index_sort(std::vector<Particle2D>& particles, size_t tile_size)
 {
-	std::sort(particles.begin(), particles.end(), [](const Particle2D& p0, const Particle2D& p1)
+	std::sort(particles.begin(), particles.end(), [tile_size](const Particle2D& p0, const Particle2D& p1)
 		{
-			return p0.spatial_index() < p1.spatial_index();
+			return p0.spatial_index(tile_size) < p1.spatial_index(tile_size);
 		});
 }
 
-void compute_spatial_hash_table(const std::vector<Particle2D>& particles, SpatialHashTable& hash_table)
+void compute_spatial_hash_table(const std::vector<Particle2D>& particles, size_t tile_size, SpatialHashTable& hash_table)
 {
 	hash_table.clear();
 
 	for (const Particle2D& particle : particles)
 	{
-		int64_t spatial_index = particle.spatial_index();
+		int64_t spatial_index = particle.spatial_index(tile_size);
 		size_t particle_index = &particle - &(*particles.begin());
 
 		auto table_value = hash_table.find(spatial_index);
