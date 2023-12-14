@@ -62,7 +62,15 @@ void compute_spatial_hash_table(const std::vector<Particle2D>& particles, Spatia
 
 This allows us to replace the binary search by spatial index with hash table lookup by spatial index, rest of the code stays the same. Since we're now looking for an exact value instead of searching for a lesser value, we can't do the row trick anymore, so we need to do one individual lookup per adjacent tile. In practice this is still faster than binary search.
 
+Of couse all this stull trivially extends to 3D - just pack the third coordinate into the spatial index. We have up to 64 bits here and tile coordinates don't need full 32 bits, so one way to pack it would be (20 bits Z, 20 bits Y, 20 bits X) and 4 spare bits left. ZYX packing order ensures that data is sorted in a cache friendly manner.
+
 The demo uses spatial hashing (with bytell_hash_table by Malte Skarupke) or spatial indexing to both find and resolve collision contact pairs and to find and highlight particles near the mouse cursor. Brute-force reference implementation is also provided, but it is extremely slow.
+
+## Applications and further improvements
+
+I think the most interesting application for this would be GPU spatial searching, for instance this could be used for storing baked light probes that are not aligned to regular grid and are freely positioned in world space. After baking we could sort them by spatial index and compute a minimal perfect hash for them, this will allow to do constant time radius searches on the GPU to find and interpolate adjacent probes. Perfect hashing would work in the same way as regular hashing, the only difference is that to find the first probe in the tile we would use something like `probes = table[spatial_index & (table_size - 1)]`. Then we would iterate a small amount of probes in the tile and select the ones we need.
+
+Another application is CPU and GPU physics, however GPU is going to have a lot of issues with sorting the data and hash tables in general. Static data could be baked with minimal perfect hashing, but for dynamic data there's still an open problem how to sort and hash it efficiently on the GPU. For CPU physics most production physics engines already use something similar, so it's a relatively common knowledge.
 
 ## Pros and cons
 
