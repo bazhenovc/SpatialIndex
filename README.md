@@ -1,5 +1,5 @@
 # SpatialIndex
-Implicit spatial acceleration structure based on spatial indexing.
+Implicit unbounded spatial acceleration structure based on spatial indexing.
 
 ![image](https://github.com/bazhenovc/SpatialIndex/assets/986127/18575683-ef4d-4c16-84c5-a16998e78a83)
 
