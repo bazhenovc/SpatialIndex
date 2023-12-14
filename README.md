@@ -76,7 +76,7 @@ Another application is CPU and GPU physics, however GPU is going to have a lot o
 
 Pros:
 * Zero memory overhead when spatial hashing is not used - tiles and spatial indices are implicit and not stored in memory.
-* When spatial hashing is used, memory overhead is low - just an exra hash_table<int64_t, uint32_t>, this is entirely optional but provides big performance improvement.
+* When spatial hashing is used, memory overhead is low - 64Kb of data to support 5000 particles. This is entirely optional but provides big performance improvement.
 * Particle data is densely packed with no gaps or wasted space.
 * Easy to paralellize and can be trivially implemented on the GPU.
 
