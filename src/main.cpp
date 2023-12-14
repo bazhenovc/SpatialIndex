@@ -246,12 +246,20 @@ void SpatialIndexApp::draw()
 		ofDrawGrid(float(TILE_SIZE), WINDOW_WIDTH / TILE_SIZE, false, false, false, true);
 	}
 
+	size_t spatial_hash_table_size = 0;
+	if (m_use_spatial_hashing)
+	{
+		spatial_hash_table_size = m_spatial_hash_table.size() * sizeof(SpatialHashTable::value_type);
+	}
+
 	std::ostringstream oss;
 	oss << "FPS: " << ofGetFrameRate()
 		<< "\nUsing spatial indexing (TAB to toggle): " << m_use_spatial_query
 		<< "\nUsing spatial hashing (T to toggle): " << m_use_spatial_hashing
 		<< "\nPhysics update time: " << double(m_update_time) / 1000.0 << "ms"
-		<< "\nParticles: " << PARTICLE_COUNT << " Solved contacts: " << m_solved_contacts
+		<< "\nParticles: " << PARTICLE_COUNT
+		<< "\nSolved contacts: " << m_solved_contacts
+		<< "\nSpatial hash table size: " << float(spatial_hash_table_size) / 1024.0F << "Kb"
 		<< "\nHighlight spatial query time: " << double(m_query_time) / 1000.0 << "ms"
 		<< "\nHighlight search radius (mouse wheel to change): " << m_search_radius
 		<< "\nHighlight checked/found particles: " << m_checked_particles << "/" << m_found_particles
